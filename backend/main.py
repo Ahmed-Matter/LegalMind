@@ -1,4 +1,5 @@
 from fastapi import FastAPI,UploadFile,File
+from reranker import rerank
 from database import cursor, conn
 import os
 from pdf_processor import extract_text,split_text
@@ -6,6 +7,8 @@ from vector_store import add_chunks
 from embeddings import create_embedding
 from vector_store import search
 from llm_service import generate_answer
+from sse_starlette.sse import EventSourceResponse
+import numpy as np
 
 app = FastAPI()
 
@@ -81,16 +84,65 @@ def list_documents():
     return docs
 
 @app.post("/chat")
-def chat(question:str):
-    query_embeddig= create_embedding(question)
-    results=search(query_embeddig)
-    if len(results) == 0:
-        return {"answer": "No documents available. Please upload a document first."}
-    context="\n".join(results)
+def chat(question: str):
 
-    prompt=f""" use the following documents to answer the question Context:{context} Question:{question} answer:"""
+    query_embedding = create_embedding(question)
+    query_embedding = np.array([query_embedding]).astype("float32")
 
-    answer=generate_answer(prompt)
+    results = search(query_embedding, k=10)
+    if len(results) > 0:
+        #print(results)
+        context = "\n".join([r["text"] for r in results])
+        prompt=f""" use the following legal documents to asnwer: context:{context}
+                question:{question} 
+                Answer clearly """
+    else:
+        prompt = f"""
+                Question: {question}
+                Answer:
+                """
+    answer = generate_answer(prompt)
 
-    return {"Question answer":answer}
+    return {"answer": answer}
+
+async def stream_answer(prompt):
+
+    answer = generate_answer(prompt)
+
+    words = answer.split()
+
+    for word in words:
+
+        yield {
+            "event": "message",
+            "data": word + " "
+        }
+
+@app.get("/chat-stream")
+async def chat_stream(question: str):
+
+    query_embedding = create_embedding(question)
+
+    results = search(query_embedding, k=10)
+
+    results=rerank(question,[r["text"] for r in results])
+
+    context = "\n".join(results)
+
+    prompt = f""" You are a legal assistant.Use ONLY the information in the context. If the answer is not present say:
+                "I cannot find this information in the uploaded documents."
+
+                Context:{context}
+
+                Question:{question}
+
+                Answer step-by-step:
+                1. Identify relevant clause
+                2. Extract key information
+                3. Provide final answer
+                """
+
+    generator = stream_answer(prompt)
+
+    return EventSourceResponse(generator)
 
