@@ -9,10 +9,14 @@ from vector_store import search
 from llm_service import generate_answer
 from sse_starlette.sse import EventSourceResponse
 import numpy as np
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI,HTTPException
 
 app = FastAPI()
 
 @app.get("/")
+
+
 def root():
     return {"message": "LegalMind API running"}
 
@@ -29,9 +33,15 @@ users = {
     }
 }
 
-from fastapi import FastAPI,HTTPException
 
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post('/login')
 def login(email:str):
