@@ -10,7 +10,12 @@ from llm_service import generate_answer
 from sse_starlette.sse import EventSourceResponse
 import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI,HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, Depends, HTTPException, Security
+from fastapi.security import HTTPBearer
+from jose import jwt
+import requests
+from fastapi import Depends
 
 app = FastAPI()
 
@@ -43,13 +48,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post('/login')
+"""@app.post('/login')
 def login(email:str):
     if(email in users):
         return users[email]
-    raise HTTPException(status_code=401,detail="user not found")
+    raise HTTPException(status_code=401,detail="user not found")"""
 
-from fastapi import Depends
+AUTH0_DOMAIN = "dev-dh4evfod0ajyzd7e.us.auth0.com"
+CLIENT_ID = "uV1mOqT9ERsyU7ngLw9cVJjjf5laxTTB"
+CLIENT_SECRET = "gnoiVE7C3ppRTh_qow_zV3Q_5Ze-DDH4waUtZAm6W3KOZ7dDta2QQZQmU406FBT1"
+
+# IMPORTANT: must match your Auth0 database connection name
+REALM = "LegalMind-Users"
+
+@app.post("/login")
+def login(email: str, password: str):
+
+    url = f"https://{AUTH0_DOMAIN}/oauth/token"
+
+    payload = {
+        "grant_type": "client_credentials",
+        "username": email,
+        "password": password,
+        
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "scope": "openid profile email"
+    }
+
+    headers = {"content-type": "application/json"}
+
+    res = requests.post(url, json=payload, headers=headers)
+
+    if res.status_code != 200:
+        print(res.text)  # helpful for debugging
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token_data = res.json()
+
+    return {
+        "access_token": token_data["access_token"],
+        "id_token": token_data.get("id_token"),
+        "expires_in": token_data["expires_in"],
+        "token_type": token_data["token_type"]
+    }
 
 def require_admin(user: dict):
     if user["role"] != "Admin":

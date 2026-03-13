@@ -1,71 +1,31 @@
-import { useState } from "react";
-import axios from "axios";
+import { useState,useEffect } from "react";
 
-function App() {
-  const [loading,setLoading] = useState(false);
-  const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState([]);
+import LoginPage from "./pages/LoginPage";
+import ChatPage from "./pages/ChatPage";
 
-  const askQuestion = async () => {
-    setLoading(true);
-    const userMessage = {
-      role: "user",
-      text: question
-    };
+function App(){
 
-    setMessages(prev => [...prev, userMessage]);
+  const [user,setUser] = useState(null);
 
-    const response = await axios.post(
-      "http://localhost:8000/chat",
-      null,
-      { params: { question: question } }
-    );
+  useEffect(()=>{
 
-    const aiMessage = {
-      role: "ai",
-      text: response.data.answer
-    };
+    const token = localStorage.getItem("access_token");
 
-    setMessages(prev => [...prev, aiMessage]);
+    if(token)
+      setUser({token});
 
-    setQuestion("");
-    setLoading(false);
-  };
+  },[]);
 
-  return (
+  if(!user)
+    return <LoginPage onLogin={setUser}/>;
 
-    <div style={{width:"600px", margin:"auto"}}>
+  return <ChatPage user={user} logout={()=>{
 
-      <h2>LegalMind AI</h2>
-      {loading && <p>AI thinking...</p>}
-      <div style={{border:"1px solid #ccc", padding:"10px", height:"400px", overflow:"auto"}}>
+    localStorage.removeItem("access_token");
+    setUser(null);
 
-        {messages.map((m, index) => (
+  }}/>;
 
-          <div key={index} style={{marginBottom:"10px"}}>
-
-            <b>{m.role === "user" ? "You" : "AI"}:</b>
-
-            <div>{m.text}</div>
-
-          </div>
-
-        ))}
-
-      </div>
-
-      <input
-        value={question}
-        onChange={(e)=>setQuestion(e.target.value)}
-        style={{width:"80%"}}
-      />
-
-      <button onClick={askQuestion}>
-        Ask
-      </button>
-
-    </div>
-  );
 }
 
 export default App;

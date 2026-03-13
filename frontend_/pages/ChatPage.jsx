@@ -1,61 +1,79 @@
-"use client";
-
 import { useState } from "react";
-import UploadPanel from "./components/UploadPanel";
+import UploadPanel from "../components/UploadPanel";
 
-export default function Home() {
+export default function ChatPage({ messages, loading, onSend, onLogout }) {
+
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<{ role: string; text: string }[]>(
-    [],
-  );
 
-  const sendMessage = async () => {
-    if (!message) return;
+  const sendMessage = () => {
 
-    const userMessage = { role: "user", text: message };
+    if (!message.trim()) return;
 
-    setMessages((prev) => [...prev, userMessage]);
-
-    const response = await fetch(
-      `http://localhost:8000/chat?question=${message}`,
-      {
-        method: "POST",
-      },
-    );
-
-    const data = await response.json();
-
-    const aiMessage = {
-      role: "assistant",
-      text: data.answer,
-    };
-
-    setMessages((prev) => [...prev, aiMessage]);
+    onSend(message);
 
     setMessage("");
+
   };
 
   return (
+
     <div className="flex h-screen">
+
+      {/* Sidebar */}
       <UploadPanel />
 
+      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
+
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between bg-white">
+
+          <h2 className="font-bold text-lg">
+            LegalMind AI
+          </h2>
+
+          <button
+            onClick={onLogout}
+            className="bg-red-500 text-white px-3 py-1 rounded"
+          >
+            Logout
+          </button>
+
+        </div>
+
+        {/* Messages */}
         <div className="flex-1 p-6 overflow-y-auto bg-gray-100">
+
           {messages.map((msg, index) => (
+
             <div
               key={index}
               className={`mb-3 ${
-                msg.role === "user" ? "text-right" : "text-left"
+                msg.role === "user"
+                  ? "text-right"
+                  : "text-left"
               }`}
             >
+
               <span className="inline-block bg-white p-3 rounded shadow">
+
                 {msg.text}
+
               </span>
+
             </div>
+
           ))}
+
+          {loading && (
+            <p className="text-gray-500">AI thinking...</p>
+          )}
+
         </div>
 
+        {/* Input */}
         <div className="p-4 border-t flex gap-2">
+
           <input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -69,8 +87,13 @@ export default function Home() {
           >
             Send
           </button>
+
         </div>
+
       </div>
+
     </div>
+
   );
+
 }
