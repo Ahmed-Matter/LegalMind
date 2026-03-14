@@ -1,68 +1,78 @@
 import { useState } from "react";
 
-export default function ChatInput({messages,setMessages,user}){
+export default function ChatInput({ messages, setMessages }) {
 
-  const [question,setQuestion] = useState("");
-  const [loading,setLoading] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const askQuestion = async ()=>{
+  const askQuestion = () => {
 
-    if(!question.trim()) return;
+    if (!question.trim()) return;
 
     setLoading(true);
 
     const userMessage = {
-      role:"user",
-      text:question
+      role: "user",
+      text: question
     };
 
-    setMessages(prev => [...prev,userMessage]);
+    const aiMessage = {
+      role: "ai",
+      text: ""
+    };
 
-    try{
+    // add both messages in ONE state update
+    setMessages(prev => [...prev, userMessage, aiMessage]);
 
-      const res = await fetch(
-        `http://localhost:8000/chat?question=${encodeURIComponent(question)}`,
-        {
-          method:"POST",
-          headers:{
-            Authorization:`Bearer ${localStorage.getItem("access_token")}`
-          }
-        }
-      );
+    const eventSource = new EventSource(
+      `http://localhost:8000/chat-stream?question=${encodeURIComponent(question)}`
+    );
 
-      const data = await res.json();
+    eventSource.onmessage = (event) => {
 
-      const aiMessage = {
-        role:"ai",
-        text:data.answer
-      };
+      if (event.data === "[DONE]") {
+        eventSource.close();
+        setLoading(false);
+        return;
+      }
 
-      setMessages(prev => [...prev,aiMessage]);
+      setMessages(prev => {
 
-    }
-    catch{
+        const updated = [...prev];
 
-      setMessages(prev=>[
-        ...prev,
-        {role:"ai",text:"Error contacting AI service"}
-      ]);
+        // append text only to last AI message
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
+          text: updated[updated.length - 1].text + event.data
+        };
 
-    }
+        return updated;
+
+      });
+
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      setLoading(false);
+    };
 
     setQuestion("");
-    setLoading(false);
 
   };
 
-  return(
+  return (
 
     <div className="flex flex-1 gap-2">
 
       <input
         value={question}
-        onChange={(e)=>setQuestion(e.target.value)}
-        placeholder="Ask a legal question..."
+        onChange={(e) => setQuestion(e.target.value)}
+        placeholder="Ask a question..."
         className="flex-1 border p-2 rounded"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") askQuestion();
+        }}
       />
 
       <button

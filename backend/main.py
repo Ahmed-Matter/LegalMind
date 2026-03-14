@@ -1,44 +1,24 @@
-from fastapi import FastAPI,UploadFile,File
-from reranker import rerank
-from database import cursor, conn
-import os
-from pdf_processor import extract_text,split_text
-from vector_store import add_chunks
-from embeddings import create_embedding
-from vector_store import search
-from llm_service import generate_answer
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 import numpy as np
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import FastAPI, Depends, HTTPException, Security
-from fastapi.security import HTTPBearer
-from jose import jwt
+import os
 import requests
-from fastapi import Depends
+
+from context_utils import extract_best_sentence
+from vector_store import add_chunks, search, load_chunks
+from embeddings import create_embedding
+from llm_service import generate_answer
+from reranker import rerank
+from database import cursor, conn
+from pdf_processor import extract_pages, split_text_by_page
+import uuid
 
 app = FastAPI()
 
-@app.get("/")
-
-
-def root():
-    return {"message": "LegalMind API running"}
-
-users = {
-    "admin@test.com": {
-        "id": 1,
-        "name": "Admin User",
-        "role": "Admin"
-    },
-    "associate@test.com": {
-        "id": 2,
-        "name": "Associate User",
-        "role": "Associate"
-    }
-}
-
-
+# -----------------------------------
+# CORS
+# -----------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,18 +28,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-"""@app.post('/login')
-def login(email:str):
-    if(email in users):
-        return users[email]
-    raise HTTPException(status_code=401,detail="user not found")"""
+# -----------------------------------
+# STARTUP
+# -----------------------------------
+
+@app.on_event("startup")
+def startup():
+
+    load_chunks()
+
+
+# -----------------------------------
+# ROOT
+# -----------------------------------
+
+@app.get("/")
+def root():
+    return {"message": "LegalMind API running"}
+
+
+# -----------------------------------
+# LOGIN (Auth0)
+# -----------------------------------
 
 AUTH0_DOMAIN = "dev-dh4evfod0ajyzd7e.us.auth0.com"
 CLIENT_ID = "uV1mOqT9ERsyU7ngLw9cVJjjf5laxTTB"
 CLIENT_SECRET = "gnoiVE7C3ppRTh_qow_zV3Q_5Ze-DDH4waUtZAm6W3KOZ7dDta2QQZQmU406FBT1"
 
-# IMPORTANT: must match your Auth0 database connection name
-REALM = "LegalMind-Users"
 
 @app.post("/login")
 def login(email: str, password: str):
@@ -92,35 +87,49 @@ def login(email: str, password: str):
         "expires_in": token_data["expires_in"],
         "token_type": token_data["token_type"]
     }
+# -----------------------------------
+# UPLOAD
+# -----------------------------------
 
-def require_admin(user: dict):
-    if user["role"] != "Admin":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
 
-    file_location = f"uploads/{file.filename}"
+    file_path = f"uploads/{file.filename}"
 
-    with open(file_location, "wb") as f:
+    with open(file_path, "wb") as f:
         f.write(await file.read())
-        text = extract_text(file_location)
-        chunks= split_text(text)
-        add_chunks(chunks)
 
+    # save document metadata
     cursor.execute(
-        "INSERT INTO documents (filename, filepath) VALUES (?, ?)",
-        (file.filename, file_location)
+        "INSERT INTO documents(filename, filepath) VALUES (?,?)",
+        (file.filename, file_path)
     )
+
+    document_id = cursor.lastrowid
 
     conn.commit()
 
-    return {"filename": file.filename}
+    pages = extract_pages(file_path)
+
+    chunks = split_text_by_page(pages)
+
+    add_chunks(chunks, document_id)
+    print("Pages extracted:", len(pages))
+    print("Chunks created:", len(chunks))
+    return {"message": "uploaded"}
+
+# -----------------------------------
+# DOCUMENT LIST
+# -----------------------------------
 
 @app.get("/documents")
 def list_documents():
 
-    cursor.execute("SELECT * FROM documents")
+    cursor.execute("SELECT id, filename, filepath FROM documents")
 
     rows = cursor.fetchall()
 
@@ -135,66 +144,131 @@ def list_documents():
 
     return docs
 
+
+# -----------------------------------
+# CHAT
+# -----------------------------------
 @app.post("/chat")
 def chat(question: str):
 
     query_embedding = create_embedding(question)
     query_embedding = np.array([query_embedding]).astype("float32")
 
-    results = search(query_embedding, k=10)
-    if len(results) > 0:
-        #print(results)
-        context = "\n".join([r["text"] for r in results])
-        prompt=f""" use the following legal documents to asnwer: context:{context}
-                question:{question} 
-                Answer clearly """
-    else:
+   
+    # vector search
+    results = search(query_embedding, k=20)
+
+    if len(results) == 0:
+
         prompt = f"""
-                Question: {question}
-                Answer:
+        You are a legal AI assistant.
+
+        Answer the question clearly.
+
+        Question:
+        {question}
+
+        Answer:
+        """
+
+        sources = []
+
+    else:
+
+        # rerank results
+        ranked_texts = rerank(question, [r["text"] for r in results])
+        #ranked_texts = ranked_texts(dict.fromkeys(ranked_texts))
+
+        # limit context (VERY IMPORTANT)
+        context = ranked_texts[0][:600]
+
+        prompt = f"""
+                Answer the question using the context.
+
+                Context:
+                {context}
+
+                Question:
+                {question}
+
+                Answer in one short sentence.
                 """
+
+        sources = [
+            f"Document {r['document_id']} page {r['page']}"
+            for r in results[:3]
+        ]
+    print("CONTEXT SENT TO LLM:")
+    print(context)
     answer = generate_answer(prompt)
 
-    return {"answer": answer}
+    print("Retrieved chunks:", len(results))
+
+    return {
+        "answer": answer,
+        "sources": sources
+    }
+
+
+# -----------------------------------
+# STREAM ANSWER
+# -----------------------------------
 
 async def stream_answer(prompt):
 
     answer = generate_answer(prompt)
 
-    words = answer.split()
+    print("RAW LLM ANSWER:", answer)
 
-    for word in words:
+    if not answer:
+        answer = "I could not generate a response."
 
-        yield {
-            "event": "message",
-            "data": word + " "
-        }
+    yield {
+        "id": str(uuid.uuid4()),   # prevents duplicate replay
+        "event": "message",
+        "data": answer
+    }
 
+    yield {
+        "event": "end",
+        "data": "[DONE]"
+    }
+# -----------------------------------
+# STREAM CHAT
+# -----------------------------------
 @app.get("/chat-stream")
 async def chat_stream(question: str):
 
     query_embedding = create_embedding(question)
+    query_embedding = np.array([query_embedding]).astype("float32")
 
-    results = search(query_embedding, k=10)
+    results = search(query_embedding, k=20)
 
-    results=rerank(question,[r["text"] for r in results])
+    if len(results) == 0:
 
-    context = "\n".join(results)
+        prompt = f"""
+        Question: {question}
 
-    prompt = f""" You are a legal assistant.Use ONLY the information in the context. If the answer is not present say:
-                "I cannot find this information in the uploaded documents."
+        Answer briefly.
+        """
 
-                Context:{context}
+    else:
 
-                Question:{question}
+        ranked_texts = rerank(question, [r["text"] for r in results])
 
-                Answer step-by-step:
-                1. Identify relevant clause
-                2. Extract key information
-                3. Provide final answer
-                """
+        # take best chunk only
+        context = ranked_texts[0][:600]
 
+        sentence = extract_best_sentence(context, question)
+
+        prompt = f"""
+        Context: {sentence}
+
+        Question: {question}
+
+        Answer briefly in one sentence.
+        """
+    print("BEST CHUNK:", context)
     generator = stream_answer(prompt)
-
-    return EventSourceResponse(generator)
-
+    print("generator :", generator)
+    return EventSourceResponse(generator, ping=15000)

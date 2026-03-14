@@ -1,10 +1,18 @@
-export default function MessageList({messages}){
+import { useEffect, useRef } from "react";
 
-  return(
+export default function MessageList({ messages }) {
+
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  return (
 
     <div className="flex-1 p-6 overflow-y-auto">
 
-      {messages.map((msg,index)=>(
+      {messages.map((msg, index) => (
 
         <div
           key={index}
@@ -15,13 +23,15 @@ export default function MessageList({messages}){
 
           <span className="inline-block bg-white p-3 rounded shadow">
 
-            {msg.text}
+            {msg.text || "AI typing..."}
 
           </span>
 
         </div>
 
       ))}
+
+      <div ref={bottomRef} />
 
     </div>
 

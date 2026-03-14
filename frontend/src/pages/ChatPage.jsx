@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
 import UploadButton from "../components/UploadButton";
@@ -8,11 +8,18 @@ export default function ChatPage({ user, logout }) {
   const [messages,setMessages] = useState([]);
   const [files,setFiles] = useState([]);
 
+  useEffect(() => {
+
+    fetch("http://localhost:8000/documents")
+      .then(res => res.json())
+      .then(data => setFiles(data))
+      .catch(err => console.error(err));
+
+  }, []);
+
   return(
 
     <div className="flex h-screen bg-gray-100">
-
-      {/* Sidebar */}
 
       <div className="w-64 bg-white border-r p-4">
 
@@ -22,16 +29,13 @@ export default function ChatPage({ user, logout }) {
           <p className="text-gray-500">No files uploaded</p>
         )}
 
-        {files.map((f,index)=>(
-          <div key={index} className="p-2 border rounded mb-2">
+        {files.map((f)=>(
+          <div key={f.id} className="p-2 border rounded mb-2">
             {f.filename}
           </div>
         ))}
 
       </div>
-
-
-      {/* Chat Area */}
 
       <div className="flex-1 flex flex-col">
 
