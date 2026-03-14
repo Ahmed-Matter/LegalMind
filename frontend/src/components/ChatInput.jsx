@@ -24,8 +24,10 @@ export default function ChatInput({ messages, setMessages }) {
     // add both messages in ONE state update
     setMessages(prev => [...prev, userMessage, aiMessage]);
 
+    const sessionId = "user-session-1";
+
     const eventSource = new EventSource(
-      `http://localhost:8000/chat-stream?question=${encodeURIComponent(question)}`
+      `http://localhost:8000/chat-stream?question=${encodeURIComponent(question)}&session_id=${sessionId}`
     );
 
     eventSource.onmessage = (event) => {

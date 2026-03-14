@@ -4,7 +4,7 @@ from sse_starlette.sse import EventSourceResponse
 import numpy as np
 import os
 import requests
-
+from memory_store import add_message, get_memory
 from context_utils import extract_best_sentence
 from vector_store import add_chunks, search, load_chunks
 from embeddings import create_embedding
@@ -214,30 +214,61 @@ def chat(question: str):
 # STREAM ANSWER
 # -----------------------------------
 
-async def stream_answer(prompt):
+async def stream_answer(prompt, session_id="default"):
 
     answer = generate_answer(prompt)
-
-    print("RAW LLM ANSWER:", answer)
 
     if not answer:
         answer = "I could not generate a response."
 
-    yield {
-        "id": str(uuid.uuid4()),   # prevents duplicate replay
-        "event": "message",
-        "data": answer
-    }
+    add_message(session_id, "assistant", answer)
 
-    yield {
-        "event": "end",
-        "data": "[DONE]"
-    }
+    yield {"event": "message", "data": answer}
+    yield {"event": "end", "data": "[DONE]"}
 # -----------------------------------
 # STREAM CHAT
 # -----------------------------------
+# @app.get("/chat-stream")
+# async def chat_stream(question: str):
+
+#     query_embedding = create_embedding(question)
+#     query_embedding = np.array([query_embedding]).astype("float32")
+
+#     results = search(query_embedding, k=20)
+
+#     if len(results) == 0:
+
+#         prompt = f"""
+#         Question: {question}
+
+#         Answer briefly.
+#         """
+
+#     else:
+
+#         ranked_texts = rerank(question, [r["text"] for r in results])
+
+#         # take best chunk only
+#         context = ranked_texts[0][:600]
+
+#         sentence = extract_best_sentence(context, question)
+
+#         prompt = f"""
+#         Context: {sentence}
+
+#         Question: {question}
+
+#         Answer briefly in one sentence.
+#         """
+#     print("BEST CHUNK:", context)
+#     generator = stream_answer(prompt)
+#     print("generator :", generator)
+#     return EventSourceResponse(generator, ping=15000)
+
 @app.get("/chat-stream")
-async def chat_stream(question: str):
+async def chat_stream(question: str, session_id: str = "default"):
+
+    add_message(session_id, "user", question)
 
     query_embedding = create_embedding(question)
     query_embedding = np.array([query_embedding]).astype("float32")
@@ -246,29 +277,39 @@ async def chat_stream(question: str):
 
     if len(results) == 0:
 
-        prompt = f"""
-        Question: {question}
-
-        Answer briefly.
-        """
+        context = ""
 
     else:
 
         ranked_texts = rerank(question, [r["text"] for r in results])
 
-        # take best chunk only
         context = ranked_texts[0][:600]
 
-        sentence = extract_best_sentence(context, question)
+    sentence = extract_best_sentence(context, question) or context
 
-        prompt = f"""
-        Context: {sentence}
+    # build memory text
+    history = get_memory(session_id)
 
-        Question: {question}
+    history_text = ""
 
-        Answer briefly in one sentence.
-        """
-    print("BEST CHUNK:", context)
+    for m in history:
+        history_text += f"{m['role']}: {m['text']}\n"
+
+    prompt = f"""
+You are a helpful assistant.
+
+Conversation history:
+{history_text}
+
+Context:
+{sentence}
+
+Question:
+{question}
+
+Answer briefly:
+"""
+
     generator = stream_answer(prompt)
-    print("generator :", generator)
-    return EventSourceResponse(generator, ping=15000)
+
+    return EventSourceResponse(generator)
