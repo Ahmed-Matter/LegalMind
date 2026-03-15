@@ -7,10 +7,10 @@ export default function ChatPage({ user, logout }) {
 
   const [messages,setMessages] = useState([]);
   const [files,setFiles] = useState([]);
-
+  const token = localStorage.getItem("access_token");
   useEffect(() => {
-
-    fetch("http://localhost:8000/documents")
+    console.log(`token : ${token}`);
+    fetch("http://localhost:8000/documents",{headers:{Authorization: `Bearer ${token}`}})
       .then(res => res.json())
       .then(data => setFiles(data))
       .catch(err => console.error(err));

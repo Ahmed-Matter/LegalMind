@@ -2,7 +2,9 @@ import faiss
 import numpy as np
 import os
 from database import cursor, conn
+from embeddings import create_embedding
 
+all_chunks = []
 dimension = 384
 chunks_store = []
 
@@ -55,69 +57,46 @@ def load_chunks():
 
         save_index()
 
-
 def add_chunks(chunks, document_id):
 
-    global chunks_store
+    global index
+    global all_chunks
 
-    from embeddings import create_embedding
-
-    embeddings = []
+    vectors = []
 
     for chunk in chunks:
 
-        text = chunk["text"].strip()
-        page = chunk["page"]
+        vector = create_embedding(chunk["text"])
 
-        if len(text) < 20:
-            continue
+        vectors.append(vector)
 
-        emb = create_embedding(text)
-        embeddings.append(emb)
-
-        cursor.execute(
-            "INSERT INTO chunks(document_id,page,text) VALUES(?,?,?)",
-            (document_id, page, text)
-        )
-
-        chunk_id = cursor.lastrowid
-
-        chunks_store.append({
-            "id": chunk_id,
+        all_chunks.append({
+            "text": chunk["text"],
             "document_id": document_id,
-            "page": page,
-            "text": text
+            "page": chunk["page"]
         })
 
-    conn.commit()
-
-    if len(embeddings) == 0:
-        return
-
-    vectors = np.array(embeddings).astype("float32")
+    vectors = np.array(vectors).astype("float32")
 
     index.add(vectors)
 
-    print("Vectors added:", len(vectors))
+def search(query_vector, k=10):
 
-    save_index()
-
-
-def search(query_embedding, k=5):
-
-    if len(chunks_store) == 0:
-        print("No chunks available")
-        return []
-
-    D, I = index.search(query_embedding, k)
+    distances, indices = index.search(query_vector, k)
 
     results = []
 
-    for idx in I[0]:
-
-        if idx < len(chunks_store):
-            results.append(chunks_store[idx])
-
-    print("Search results:", len(results))
+    for i in indices[0]:
+        if i < len(all_chunks):
+            results.append(all_chunks[i])
 
     return results
+
+def load_chunks():
+
+    global all_chunks
+
+    # load from database if you have that
+    # or rebuild from stored metadata
+
+    print("Chunks loaded:", len(all_chunks))

@@ -21,13 +21,13 @@ export default function ChatInput({ messages, setMessages }) {
       text: ""
     };
 
-    // add both messages in ONE state update
+    const token = localStorage.getItem("access_token");
     setMessages(prev => [...prev, userMessage, aiMessage]);
 
     const sessionId = "user-session-1";
 
     const eventSource = new EventSource(
-      `http://localhost:8000/chat-stream?question=${encodeURIComponent(question)}&session_id=${sessionId}`
+    `http://localhost:8000/chat-stream?question=${encodeURIComponent(question)}&session_id=${sessionId}&token=${token}`
     );
 
     eventSource.onmessage = (event) => {
