@@ -62,9 +62,9 @@ def root():
 # -----------------------------------
 
 AUTH0_DOMAIN = "dev-dh4evfod0ajyzd7e.us.auth0.com"
-CLIENT_ID = "Ui0TSbmBvEVEEgChreQQXuuhN8JOn9DF"
-CLIENT_SECRET = "oYbU29M_u7JZ1V4ZMU9YJd2_gOgmTDGxUUHqmZ03fowBYqrmjK50bKZAw3yAyBhU"
-API_AUDIENCE="https://dev-LegalMind/login"
+CLIENT_ID = "CLIENT_ID"
+CLIENT_SECRET = "AUTH_SECRET"
+API_AUDIENCE="AUTH_API"
 
 
 
