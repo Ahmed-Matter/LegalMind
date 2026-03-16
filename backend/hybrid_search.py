@@ -1,5 +1,5 @@
 from rank_bm25 import BM25Okapi
-from vector_store import all_chunks
+from vectorstore.vector_store import all_chunks
 import numpy as np
 
 bm25 = None

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body,Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body,Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 import numpy as np
@@ -6,7 +6,7 @@ import os
 import requests
 from memory_store import add_message, get_memory
 from context_utils import extract_best_sentence
-from vector_store import add_chunks, search, load_chunks
+from vectorstore.vector_store import add_chunks, search, load_chunks
 from embeddings import create_embedding
 from llm_service import generate_answer
 from reranker import rerank
@@ -15,7 +15,12 @@ from pdf_processor import extract_pages, split_text_by_page
 from hybrid_search import build_bm25, keyword_search
 from auth import verify_token, verify_token_from_query
 
+#during reactoring
+from api.chat import router as chat_router  
+
 app = FastAPI()
+
+app.include_router(chat_router) #refator
 
 # -----------------------------------
 # CORS
