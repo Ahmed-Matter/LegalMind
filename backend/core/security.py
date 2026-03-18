@@ -87,5 +87,4 @@ def verify_token_from_query(token: str):
         audience=API_AUDIENCE,
         issuer=f"https://{AUTH0_DOMAIN}/",
     )
-    print("Token verfication " ,token)
     return payload
