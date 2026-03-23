@@ -13,4 +13,4 @@ def rerank(question,chunks):
 
     ranked.sort(key=lambda x:x[1], reverse=True)
 
-    return [r[0] for r in ranked[:3]]
+    return [r[0] for r in ranked[:10]]

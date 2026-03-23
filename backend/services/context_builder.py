@@ -1,17 +1,24 @@
-def build_context(chunks,max_chunks=5):
-    """build structured context for the LLM"""
-    select_chunks=chunks[:max_chunks]
 
-    context_parts=[]
+def build_context(chunks, question=None, max_chunks=2, max_chars=1200):
 
-    for i, chunk in enumerate(select_chunks):
+    if not chunks:
+        return ""
 
-        source= chunk.get("source", "Unkown Source")
-        text= chunk.get("text","")
+    # 🔥 remove duplicates while preserving order
+    seen = set()
+    unique_chunks = []
 
-        context_parts.append(f"Source {i+1}: {source}\n{text}")
-        #context_parts.append(f"Source {i+1}: {source}\n{text}")
+    for c in chunks:
+        text = c["text"].strip()
+        if text not in seen:
+            seen.add(text)
+            unique_chunks.append(text)
 
-        context="\n\n".join(context_parts)
+    # 🔥 take top N chunks (already ranked)
+    selected_chunks = unique_chunks[:max_chunks]
 
-        return context
+    # 🔥 merge into one coherent context
+    merged_text = " ".join(selected_chunks)
+
+    # 🔥 final trim (keep full meaning)
+    return merged_text[:max_chars]

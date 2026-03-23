@@ -4,32 +4,37 @@ import os
 from database import cursor, conn
 from embeddings import create_embedding
 
+# single source of truth
 all_chunks = []
-dimension = 384
-chunks_store = []
 
+dimension = 384
+
+# load or create index
 if os.path.exists("vector.index"):
     index = faiss.read_index("vector.index")
 else:
     index = faiss.IndexFlatL2(dimension)
 
 
+# ----------------------------
+# SAVE INDEX
+# ----------------------------
 def save_index():
     faiss.write_index(index, "vector.index")
 
 
+# ----------------------------
+# LOAD CHUNKS FROM DB
+# ----------------------------
 def load_chunks():
 
-    global chunks_store
-
-    from embeddings import create_embedding
+    global all_chunks
+    global index
 
     cursor.execute("SELECT id, document_id, page, text FROM chunks")
-
     rows = cursor.fetchall()
 
-    chunks_store = []
-
+    all_chunks = []
     embeddings = []
 
     for r in rows:
@@ -41,8 +46,9 @@ def load_chunks():
             "text": r[3]
         }
 
-        chunks_store.append(chunk)
+        all_chunks.append(chunk)
 
+        # IMPORTANT: same embedding logic as add_chunks
         emb = create_embedding(chunk["text"])
         embeddings.append(emb)
 
@@ -53,10 +59,16 @@ def load_chunks():
         index.reset()
         index.add(vectors)
 
-        print("Loaded chunks:", len(chunks_store))
+        print("Loaded chunks:", len(all_chunks))
 
         save_index()
+    else:
+        print("No chunks found in DB")
 
+
+# ----------------------------
+# ADD CHUNKS
+# ----------------------------
 def add_chunks(chunks, document_id):
 
     global index
@@ -66,37 +78,75 @@ def add_chunks(chunks, document_id):
 
     for chunk in chunks:
 
-        vector = create_embedding(chunk["text"])
+        text = f"{chunk.get('title','')}\n{chunk['text']}"
 
+        if not is_valid_chunk(text):
+            continue
+
+        # embedding
+        vector = create_embedding(text)
         vectors.append(vector)
 
+        # store in DB
+        cursor.execute(
+            "INSERT INTO chunks (document_id, page, text) VALUES (?, ?, ?)",
+            (document_id, chunk.get("page", 0), text)
+        )
+
+        # store in memory
         all_chunks.append({
-            "text": chunk["text"],
+            "text": text,
             "document_id": document_id,
-            "page": chunk["page"]
+            "page": chunk.get("page", 0)
         })
 
-    vectors = np.array(vectors).astype("float32")
+    conn.commit()
 
-    index.add(vectors)
+    print("=== SAMPLE CHUNKS ===")
+    for c in all_chunks[:5]:
+        print(c["text"][:200])
+        
+    if len(vectors) > 0:
+        vectors = np.array(vectors).astype("float32")
+        index.add(vectors)
 
-def search(query_vector, k=10):
+        save_index()
+
+        print("Added chunks:", len(vectors))
+
+# ----------------------------
+# SEARCH
+# ----------------------------
+def search(query_vector, k=20):
+
+    if index.ntotal == 0:
+        return []
 
     distances, indices = index.search(query_vector, k)
 
     results = []
 
     for i in indices[0]:
-        if i < len(all_chunks):
+        if 0 <= i < len(all_chunks):
             results.append(all_chunks[i])
 
     return results
 
-def load_chunks():
+def is_valid_chunk(text):
 
-    global all_chunks
+    text = text.strip()
 
-    # load from database if you have that
-    # or rebuild from stored metadata
+    # too short
+    if len(text) < 40:
+        return False
 
-    print("Chunks loaded:", len(all_chunks))
+    # mostly underscores / noise
+    if text.count("_") > 5:
+        return False
+
+    # no meaningful words
+    words = text.split()
+    if len(words) < 5:
+        return False
+
+    return True

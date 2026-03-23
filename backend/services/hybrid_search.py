@@ -65,4 +65,4 @@ def hybrid_search(query, vector_result, k=10):
             seen.add(chunk_id)
             unique_results.append(chunk)
 
-    return unique_results[:k]
+    return unique_results

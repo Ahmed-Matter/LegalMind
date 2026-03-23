@@ -7,8 +7,7 @@ MODEL_NAME = "google/flan-t5-large"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
 
-# keep prompts short for stability
-MAX_PROMPT_CHARS = 700
+MAX_PROMPT_CHARS = 1500
 
 
 def clean_text(text: str):
@@ -16,10 +15,8 @@ def clean_text(text: str):
     Remove repeated words and duplicated phrases.
     """
 
-    # normalize spaces
     text = re.sub(r"\s+", " ", text)
 
-    # remove duplicated consecutive words
     words = text.split()
     cleaned_words = []
 
@@ -29,7 +26,6 @@ def clean_text(text: str):
 
     text = " ".join(cleaned_words)
 
-    # remove repeated short phrases
     text = re.sub(r"\b(\w+)( \1\b)+", r"\1", text, flags=re.IGNORECASE)
 
     return text.strip()
@@ -37,7 +33,6 @@ def clean_text(text: str):
 
 def generate_answer(prompt: str):
 
-    # prevent very long prompts
     if len(prompt) > MAX_PROMPT_CHARS:
         prompt = prompt[:MAX_PROMPT_CHARS]
 
@@ -52,11 +47,13 @@ def generate_answer(prompt: str):
 
         outputs = model.generate(
             **inputs,
-            max_new_tokens=60,
-            num_beams=4,
-            no_repeat_ngram_size=3,
-            repetition_penalty=1.3,
-            length_penalty=1.0,
+            max_new_tokens=120,
+            num_beams=1,
+            do_sample=False,
+            temperature=0.0,
+            no_repeat_ngram_size=2,
+            repetition_penalty=1.2,
+            length_penalty=1.1,
             early_stopping=True
         )
 

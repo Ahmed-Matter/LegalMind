@@ -1,16 +1,42 @@
-def extract_best_sentence(context, question):
+import re
 
-    sentences = context.split(".")
-    question_words = question.lower().split()
+def extract_best_sentences(context, question, top_n=3):
 
-    best_sentence = ""
-    best_score = 0
+    q = question.lower()
+
+    # 🔥 if asking definition → return FULL section
+    if "what is" in q or "define" in q:
+
+        # take first 2–3 lines directly
+        parts = re.split(r'(?<=[\.\n])', context)
+
+        selected = []
+        for p in parts:
+            p = p.strip()
+            if p:
+                selected.append(p)
+            if len(selected) >= 3:
+                break
+
+        return " ".join(selected)
+
+    # fallback (scoring)
+    sentences = re.split(r'(?<=[\.\n])', context)
+
+    keywords = set(q.split())
+
+    scored = []
 
     for s in sentences:
-        score = sum(1 for w in question_words if w in s.lower())
+        s = s.strip()
+        if not s:
+            continue
 
-        if score > best_score:
-            best_score = score
-            best_sentence = s
+        score = sum(1 for w in keywords if w in s.lower())
+        scored.append((s, score))
 
-    return best_sentence.strip()
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    best_sentences = [s for s, _ in scored[:top_n]]
+
+    return " ".join(best_sentences)

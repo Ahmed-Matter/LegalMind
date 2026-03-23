@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, Query
 from sse_starlette.sse import EventSourceResponse
 
+from services.query_service import rewrite_question
+from services.prompt_service import build_prompt
 from services.retrieval_service import RetrievalService
 from services.llm_service import generate_answer
 from services.memory_store import add_message, get_memory
 from core.security import verify_token, verify_token_from_query
+from services.context_builder import build_context
 
 
 router = APIRouter()
@@ -12,44 +15,32 @@ router = APIRouter()
 retrieval_service = RetrievalService()
 
 
-# ----------------------------
+ #
 # CHAT (normal)
-# ----------------------------
+ #
 @router.post("/chat")
 def chat(question: str, user=Depends(verify_token)):
 
-    ranked_chunks = retrieval_service.retrieve(question, k=20)
+    ranked_chunks = retrieval_service.retrieve(question, k=50)
+
+    session_id = "default"
+    history = get_memory(session_id)
 
     if not ranked_chunks:
-        prompt = f"""
-You are a legal AI assistant.
-
-Answer the question clearly.
-
-Question:
-{question}
-
-Answer:
-"""
+        context = ""
         sources = []
-
     else:
-        context = ranked_chunks[0][:600]
+        context = build_context(ranked_chunks, question)
 
-        prompt = f"""
-Answer the question using the context.
+        sources = [
+            f"document {c['document_id']} page {c['page']}"
+            for c in ranked_chunks[:3]
+        ]
 
-Context:
-{context}
+    # prompt
+    prompt = build_prompt(question, context, history)
 
-Question:
-{question}
-
-Answer in one short sentence.
-"""
-        sources = [f"document {c['document_id']} page {c['page']}"
-                   for c in ranked_chunks[:3]]
-
+    
     answer = generate_answer(prompt)
 
     return {
@@ -58,9 +49,9 @@ Answer in one short sentence.
     }
 
 
-# ----------------------------
+ #
 # STREAM CHAT
-# ----------------------------
+ #
 @router.get("/chat-stream")
 async def chat_stream(
     question: str,
@@ -70,50 +61,36 @@ async def chat_stream(
 
     verify_token_from_query(token)
 
-    add_message(session_id, "user", question)
+    history = get_memory(session_id)
 
-    ranked_chunks = retrieval_service.retrieve(question, k=20)
+    # rewrite BEFORE adding current question
+    rewritten_question = rewrite_question(question, history)
+
+    # now store original question (not rewritten!)
+    add_message(session_id, "user", question)
+    ranked_chunks = retrieval_service.retrieve(rewritten_question, k=50)
 
     if not ranked_chunks:
         context = ""
     else:
-        if not ranked_chunks:
-            context = ""
-        else:
-            context = "\n".join(
-        c["text"] for c in ranked_chunks[:3])[:1000]
+        context = build_context(ranked_chunks, question)
 
-    history = get_memory(session_id)
+   
 
     history_text = "\n".join(
         f"{m['role']}: {m['text']}" for m in history
     )
 
-    prompt = f"""
-You are a helpful assistant.
-
-Use the context to answer the question.
-
-Conversation history:
-{history_text}
-
-Context:
-{context}
-
-Question:
-{question}
-
-Answer in one clear sentence.
-"""
-
+    prompt = build_prompt(question, context, history)
     generator = stream_answer(prompt)
-
+    print("\n=== CONTEXT ===")
+    print(context)
     return EventSourceResponse(generator)
 
 
-# ----------------------------
+ #
 # STREAM HELPER
-# ----------------------------
+ #
 async def stream_answer(prompt, session_id="default"):
 
     answer = generate_answer(prompt)
