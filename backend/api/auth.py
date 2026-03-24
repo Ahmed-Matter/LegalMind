@@ -5,7 +5,7 @@ auth_router=APIRouter()
 
 AUTH0_DOMAIN = "dev-dh4evfod0ajyzd7e.us.auth0.com"
 CLIENT_ID = "Ui0TSbmBvEVEEgChreQQXuuhN8JOn9DF"
-CLIENT_SECRET = "oYbU29M_u7JZ1V4ZMU9YJd2_gOgmTDGxUUHqmZ03fowBYqrmjK50bKZAw3yAyBhU"
+CLIENT_SECRET = "CLIENT_SECRET"
 API_AUDIENCE="https://dev-LegalMind/login"
 
 @auth_router.post("/login")
