@@ -9,12 +9,16 @@ def build_prompt(question, context, history=None):
     return f"""
 You are a legal AI assistant.
 
-Answer using ONLY the provided context.
+Answer ONLY using the provided context.
 
-Extract the full definition clearly.
+Extract the FULL and COMPLETE answer.
 
-Do NOT summarize too much.
-Do NOT guess.
+IMPORTANT RULES:
+- Include ALL details (a, b, c if exist)
+- Do NOT summarize
+- Do NOT shorten
+- Do NOT return only part of the answer
+- Do NOT return titles only
 
 Context:
 {context}
@@ -22,5 +26,5 @@ Context:
 Question:
 {question}
 
-Answer:
+Full Answer:
 """

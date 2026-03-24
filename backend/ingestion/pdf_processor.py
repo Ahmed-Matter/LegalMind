@@ -10,15 +10,19 @@ def clean_text(text):
     # remove line breaks
     text = re.sub(r"\n+", " ", text)
 
-    # 🔥 fix glued words (lowercase → uppercase)
+    #   fix glued words (lowercase → uppercase)
     text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
 
-    # 🔥 fix missing spaces after punctuation
+    #   fix missing spaces after punctuation
     text = re.sub(r"([.,;:])([A-Za-z])", r"\1 \2", text)
 
     # fix broken words (m onth → month)
-    text = re.sub(r"(\w)\s+(\w)", r"\1\2", text)
+    text = re.sub(r"\b(\w)\s+(\w)\b", r"\1\2", text)
+    # add space between number and word
+    text = re.sub(r"(\d)([A-Za-z])", r"\1 \2", text)
 
+# add space between word and number
+    text = re.sub(r"([A-Za-z])(\d)", r"\1 \2", text)
     # remove duplicate words
     text = re.sub(r"\b(\w+)( \1\b)+", r"\1", text, flags=re.IGNORECASE)
 
@@ -57,10 +61,10 @@ def extract_pages(file_path):
 #     # remove line breaks
 #     text = re.sub(r"\n+", " ", text)
 
-#     # 🔥 FIX glued words (lowercase → uppercase)
+#     #   FIX glued words (lowercase → uppercase)
 #     text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
 
-#     # 🔥 FIX missing spaces after punctuation
+#     #   FIX missing spaces after punctuation
 #     text = re.sub(r"([.,;:])([A-Za-z])", r"\1 \2", text)
 
 #     # fix broken words (m onth → month)
@@ -74,7 +78,7 @@ def extract_pages(file_path):
 
 #     return text.strip()
 
-def split_text_by_page(pages, chunk_size=150, overlap=30):
+# def split_text_by_page(pages, chunk_size=150, overlap=30):
 
     chunks = []
 
@@ -107,50 +111,54 @@ def split_by_articles(text):
 
     text = re.sub(r"\s+", " ", text)
 
-    # try multiple patterns (robust)
-    patterns = [
-        r"(Article\s*\d+.*?)(?=Article\s*\d+|$)",
-        r"(\d+\.\s+[A-Za-z].*?)(?=\d+\.\s+[A-Za-z]|$)",
-        r"(Probation.*?)(?=Termination|Salary|$)"
-    ]
+    #   split ONLY by section numbers (e.g., "1. ", "2. ")
+    parts = re.split(r"(?=\d+\.\s+[A-Za-z])", text)
 
-    for pattern in patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
+    chunks = []
 
-        if matches and len(matches) > 1:
-            chunks = []
-            for m in matches:
-                chunks.append({
-                    "text": m.strip(),
-                    "title": m[:50],
-                    "page": 0
-                })
+    for part in parts:
+        part = part.strip()
 
-            print("Chunks found:", len(chunks))
-            return chunks
+        # skip empty or tiny fragments
+        if len(part) < 100:
+            continue
 
-    print("Chunks found: 0")
-    return []
+        chunks.append({
+            "text": part,
+            "page": 0
+        })
+
+    print("Chunks found:", len(chunks))
+    return chunks
 
 def process_pdf(file_path):
 
     pages = extract_pages(file_path)
 
-    # combine all pages
     full_text = " ".join(p["text"] for p in pages if p["text"])
 
-    # try structured split
-    article_chunks = split_by_articles(full_text)
+    #   STRICT SECTION SPLIT
+    import re
+    parts = re.split(r"(?=\d+\.\s+[A-Za-z])", full_text)
 
-    # 🔥 FALLBACK (VERY IMPORTANT)
-    if not article_chunks or len(article_chunks) == 0:
-        print("⚠️ No structured chunks → fallback to page split")
-        return split_text_by_page(pages)
+    chunks = []
 
-    return split_large_chunks(article_chunks)
+    for part in parts:
+        part = part.strip()
+
+        if len(part) < 100:
+            continue
+
+        chunks.append({
+            "text": part,
+            "page": 0
+        })
+
+    print("Chunks found:", len(chunks))
+    return chunks
 
 
-def split_large_chunks(chunks, max_words=200, overlap=50):
+# def split_large_chunks(chunks, max_words=200, overlap=50):
 
     new_chunks = []
 

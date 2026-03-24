@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Depends
 import os
 
 from database import cursor, conn
-from ingestion.pdf_processor import extract_pages, split_text_by_page, process_pdf
+from ingestion.pdf_processor import extract_pages, process_pdf
 from vectorstore.vector_store import add_chunks
 from services.hybrid_search import build_bm25
 from core.security import verify_token

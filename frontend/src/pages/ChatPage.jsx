@@ -17,7 +17,7 @@ useEffect(() => {
 
   const token = localStorage.getItem("access_token");
 
-  // 🔥 no token → redirect immediately
+  //   no token → redirect immediately
   if (!token) {
     handleAuthError();
     return;

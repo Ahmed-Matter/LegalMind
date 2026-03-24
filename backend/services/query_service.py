@@ -16,15 +16,15 @@ def rewrite_question(question, history):
 
     q = question.lower()
 
-    # 🔥 handle pronouns
+    #   handle pronouns
     if "it" in q and last_user_question:
         return f"{last_user_question}. {question}"
 
-    # 🔥 normalize common legal queries
-    if "probation" in q:
-        return question + " probation period employee trial period"
+    #   normalize common legal queries
+    # if "probation" in q:
+    #     return question + " probation period employee trial period"
 
-    if "salary" in q:
-        return question + " salary compensation employee payment"
+    # if "salary" in q:
+    #     return question + " salary compensation employee payment"
 
     return question

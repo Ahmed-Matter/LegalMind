@@ -4,7 +4,7 @@ def extract_best_sentences(context, question, top_n=3):
 
     q = question.lower()
 
-    # 🔥 if asking definition → return FULL section
+    #   if asking definition → return FULL section
     if "what is" in q or "define" in q:
 
         # take first 2–3 lines directly

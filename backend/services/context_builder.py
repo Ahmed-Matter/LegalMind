@@ -1,10 +1,9 @@
 
-def build_context(chunks, question=None, max_chunks=2, max_chars=1200):
+def build_context(chunks, question=None, max_chunks=4, max_chars=2000):
 
     if not chunks:
         return ""
 
-    # 🔥 remove duplicates while preserving order
     seen = set()
     unique_chunks = []
 
@@ -14,11 +13,11 @@ def build_context(chunks, question=None, max_chunks=2, max_chars=1200):
             seen.add(text)
             unique_chunks.append(text)
 
-    # 🔥 take top N chunks (already ranked)
+    #   take top N chunks (already ranked)
     selected_chunks = unique_chunks[:max_chunks]
 
-    # 🔥 merge into one coherent context
+    #   merge into one coherent context
     merged_text = " ".join(selected_chunks)
 
-    # 🔥 final trim (keep full meaning)
+    #   final trim (keep full meaning)
     return merged_text[:max_chars]
