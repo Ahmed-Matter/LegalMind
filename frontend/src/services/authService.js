@@ -19,3 +19,8 @@ export async function login(email, password) {
 
   return data;
 }
+
+export function handleAuthError() {
+  localStorage.removeItem("access_token");
+  window.location.href = "/login"; // or your route
+}

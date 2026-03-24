@@ -1,10 +1,16 @@
 import { useState } from "react";
+import { handleAuthError } from "../services/authService";
 
 export default function ChatInput({ messages, setMessages }) {
 
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
+  const token = localStorage.getItem("access_token");
 
+  if (!token) {
+    handleAuthError();
+    return;
+  }
   const askQuestion = () => {
 
     if (!question.trim()) return;
@@ -38,6 +44,7 @@ export default function ChatInput({ messages, setMessages }) {
         return;
       }
 
+
       setMessages(prev => {
 
         const updated = [...prev];
@@ -54,9 +61,12 @@ export default function ChatInput({ messages, setMessages }) {
 
     };
 
-    eventSource.onerror = () => {
+   eventSource.onerror = (err) => {
+      console.log("SSE error:", err);
+
       eventSource.close();
       setLoading(false);
+
     };
 
     setQuestion("");

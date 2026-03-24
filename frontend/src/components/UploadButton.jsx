@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { handleAuthError } from "../services/authService";
 
 export default function UploadButton({setFiles}){
 
@@ -16,6 +17,10 @@ export default function UploadButton({setFiles}){
         Authorization:`Bearer ${localStorage.getItem("access_token")}`
       }
     });
+    if(res.status===401){
+      handleAuthError();
+      return;
+    }
 
     const data = await res.json();
 
