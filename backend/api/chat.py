@@ -32,10 +32,14 @@ def chat(question: str, user=Depends(verify_token)):
     else:
         context = build_context(ranked_chunks, question)
 
-        sources = [
-            f"document {c['document_id']} page {c['page']}"
-            for c in ranked_chunks[:3]
-        ]
+    sources = [
+        {
+            "document_id": c["document_id"],
+            "page": c["page"],
+            "text": c["text"][:300]  # preview for highlight
+        }
+        for c in ranked_chunks[:3]
+    ]
 
     # prompt
     prompt = build_prompt(question, context, history)

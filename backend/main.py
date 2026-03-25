@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from vectorstore.vector_store import add_chunks, search, load_chunks
 from services.hybrid_search import build_bm25, keyword_search
 from services.retrieval_service import RetrievalService
-
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -18,7 +18,7 @@ app.include_router(chat_router) #refator
 app.include_router(auth_router)
 app.include_router(docs_router)
 
-
+app.mount("/files", StaticFiles(directory="uploads"), name="files")
 
 
 origins = [

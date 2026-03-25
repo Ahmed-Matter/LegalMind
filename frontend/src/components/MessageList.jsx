@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 
-export default function MessageList({ messages }) {
-
+export default function MessageList({ messages, onSourceClick }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -9,32 +8,28 @@ export default function MessageList({ messages }) {
   }, [messages]);
 
   return (
-
     <div className="flex-1 p-6 overflow-y-auto">
-
       {messages.map((msg, index) => (
+        <div key={index} className="mb-3">
+          <p>{msg.text}</p>
 
-        <div
-          key={index}
-          className={`mb-3 ${
-            msg.role === "user" ? "text-right" : "text-left"
-          }`}
-        >
-
-          <span className="inline-block bg-white p-3 rounded shadow">
-
-            {msg.text || "AI typing..."}
-
-          </span>
-
+          {msg.sources && (
+            <div className="mt-2">
+              {msg.sources.map((s, i) => (
+                <div
+                  key={i}
+                  className="text-blue-600 cursor-pointer text-sm hover:underline"
+                  onClick={() => onSourceClick(s)} // ✅ FIXED
+                >
+                  Source {i + 1}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-
       ))}
 
       <div ref={bottomRef} />
-
     </div>
-
   );
-
 }

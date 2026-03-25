@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Depends
 import os
+from fastapi.staticfiles import StaticFiles
 
 from database import cursor, conn
 from ingestion.pdf_processor import extract_pages, process_pdf
@@ -51,3 +52,4 @@ def list_documents(user=Depends(verify_token)):
         {"id": r[0], "filename": r[1], "path": r[2]}
         for r in cursor.fetchall()
     ]
+
