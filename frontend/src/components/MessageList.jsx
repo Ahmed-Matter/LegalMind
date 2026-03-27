@@ -19,7 +19,7 @@ export default function MessageList({ messages, onSourceClick }) {
                 <div
                   key={i}
                   className="text-blue-600 cursor-pointer text-sm hover:underline"
-                  onClick={() => onSourceClick(s)} // ✅ FIXED
+                  onClick={() => onSourceClick(s)} //  FIXED
                 >
                   Source {i + 1}
                 </div>

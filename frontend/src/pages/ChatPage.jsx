@@ -12,7 +12,10 @@ function handleAuthError() {
 export default function ChatPage({ user, logout }) {
   const [messages, setMessages] = useState([]);
   const [files, setFiles] = useState([]);
-  const [selectedSource, setSelectedSource] = useState(null); // ✅ FIXED
+  const [selectedSource, setSelectedSource] = useState(null);
+
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [lastAnswer, setLastAnswer] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -23,9 +26,7 @@ export default function ChatPage({ user, logout }) {
     }
 
     fetch("http://localhost:8000/documents", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
         if (res.status === 401) {
@@ -40,16 +41,22 @@ export default function ChatPage({ user, logout }) {
       .catch(console.error);
   }, []);
 
-  // ✅ FIXED: moved here
   const handleSourceClick = (source) => {
     const doc = files.find((f) => f.id === source.document_id);
-
     if (!doc) return;
+
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "user");
+
+    const lastAiMessage = [...messages].reverse().find((m) => m.role === "ai");
 
     setSelectedSource({
       url: `http://localhost:8000/files/${doc.filename}`,
       page: source.page,
       text: source.text,
+      question: lastUserMessage?.text || "",
+      answer: lastAiMessage?.text || "",
     });
   };
 
@@ -72,15 +79,17 @@ export default function ChatPage({ user, logout }) {
 
       {/* CENTER: chat */}
       <div className="flex-1 flex flex-col">
-        <MessageList
-          messages={messages}
-          onSourceClick={handleSourceClick} // ✅ FIXED
-        />
+        <MessageList messages={messages} onSourceClick={handleSourceClick} />
 
         <div className="border-t p-4 flex gap-2 items-center">
           <UploadButton setFiles={setFiles} />
 
-          <ChatInput messages={messages} setMessages={setMessages} />
+          <ChatInput
+            messages={messages}
+            setMessages={setMessages}
+            setCurrentQuestion={setCurrentQuestion}
+            setLastAnswer={setLastAnswer}
+          />
 
           <button
             onClick={logout}
@@ -98,6 +107,8 @@ export default function ChatPage({ user, logout }) {
             fileUrl={selectedSource.url}
             page={selectedSource.page}
             highlightText={selectedSource.text}
+            question={selectedSource.question}
+            answer={selectedSource.answer}
           />
         </div>
       )}

@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.pdf-highlight {
+  background-color: rgba(255, 255, 0, 0.4);
+  border-radius: 3px;
+  padding: 1px;
+}
